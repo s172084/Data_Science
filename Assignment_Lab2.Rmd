@@ -1,0 +1,126 @@
+---
+title: "R for Bio Data Science"
+author: "Oriade Latifah Simpson"
+date: "Spring 2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**Group Number : 20**
+
+***
+
+**Instructions**:
+
+Please hand in T7 and only T7.
+
+When you hand in, please hand in the knitted html file, with visible code and plot.
+
+Deadline for handing in is Thursday 23:59.
+
+Remember to add group number and names to your output.
+
+Due Date: **10 February, 2022 11:59 PM**
+
+***
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(remotes)
+library(viridisLite)
+#library(datamicroarray)
+#remotes::install_github("ramhiser/datamicroarray")
+```
+
+```{r}
+gravier = readRDS(file = "Data/gravier.rdata")
+#gravier
+```
+
+Information about the data is found here: https://github.com/ramhiser/datamicroarray
+
+***
+
+**The data**
+
+```{r}
+#data('gravier', package = 'datamicroarray')
+set.seed(676571)
+
+cancer_data=mutate(as_tibble(pluck(gravier,"x")),
+                   y=pluck(gravier,"y"),
+                   pt_id=1:length(pluck(gravier, "y")),
+                   age=round(rnorm(length(pluck(gravier,"y")),
+                                   mean=55,sd=10),1))
+cancer_data=rename(cancer_data,event_label=y)
+cancer_data$age_group=cut(cancer_data$age,
+                          breaks=seq(10,100,
+                                     by=10))
+```
+
+***
+
+**T7: Pick your favourite gene and create densitograms of expression levels stratified on the variable event_label**
+
+```{r}
+ggplot(
+  data = cancer_data ,
+  
+  mapping = aes(x = g7F07, fill = event_label))+
+  
+  geom_density(alpha = 0.5)+
+  
+  # Add lines for the mean and median gene expression levels. 
+  geom_vline(aes(xintercept = mean(g7F07)), colour = "#363445", lwd = 0.5, linetype = "longdash") +
+  geom_vline(aes(xintercept = median(g7F07)), colour = "#363445", lwd = 0.7, linetype = "solid")+
+  
+  # Add a theme. 
+  theme_gray()+
+  
+  # Add a facet based on the event label. 
+  facet_wrap(~event_label, scales="free")+
+  
+  # Add a colour palette you like. 
+  scale_fill_manual(values = c("#ffb400", "#9080ff"))+
+  # scale_fill_manual(values = viridisLite::viridis(2))
+  
+  # Add some labels. 
+  labs(
+    y = "Density",
+    x = "The log2 transformed gene expression level of gene g7F07",
+    title = "Densitogram",
+    subtitle = "The distribution of the log2 transformed gene expression level (g7F07)",
+    caption = "Figure 1",
+    
+    # change the name of the legend. 
+    fill="Event Label") +
+    theme(plot.title=element_text(family="Avenir", 
+                                  face="bold", 
+                                  size=20, colour = "darkblue"))
+
+
+```
+
+***
+
+The distribution of the expression level of the gene g7F07 is shown above. 
+
+Good (outcomes) represent the patients who have no metastatic or loco-regional recurrence after diagnosis.
+
+Poor (outcomes) represent the patients who have early metastasis or metastatic relapse.
+
+There are two peaks in the distribution of the data.
+
+***
+
+* Colour palettes information: <https://www.heavy.ai/blog/12-color-palettes-for-telling-better-stories-with-your-data>
+
+* Change line width: <https://stackoverflow.com/questions/14794599/how-to-change-line-width-in-ggplot> 
+
+* Paper: A Prognostic DNA Signature for T1T2 Node-Negative Breast Cancer Patients by Eleonore Gravier et.al 
+<https://onlinelibrary-wiley-com.ep.fjernadgang.kb.dk/doi/full/10.1002/gcc.20820>
+
+
