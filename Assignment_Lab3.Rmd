@@ -1,0 +1,102 @@
+---
+title: "R for Bio Data Science"
+author: "Oriade Latifah Simpson"
+date: "Spring 2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**Group Number : 20**
+
+***
+
+**Instructions**
+
+For this assignment you are to apply what you have learned in the two data visualisation labs.
+
+The task is to create a really nice plot using one of two datasets, the cancer_data or the SPE_ENV
+
+This time, submit one PDF file per group.
+
+Submit only this assignment, not the entire exercise
+
+Make it nice, add a title, your group number and names and a bit of text to along with your data visualisation
+
+Deadline is Thursday 23:59 as usual
+
+***
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(ggridges)
+```
+
+
+```{r}
+SPE_ENV = read_tsv(file = "data/SPE_ENV.tsv")
+SPE_ENV
+```
+
+
+```{r message=FALSE, warning=FALSE}
+# pick a few taxa. 
+new_taxa <-  c("Flavobacteria", "Bacteroidia", "Acidobacteria_Gp18", "Methaobacteria")
+
+SPE_ENV2 <- filter(SPE_ENV, Taxa %in% new_taxa)
+#SPE_ENV2
+
+SPE_ENV2 %>% 
+  ggplot(mapping = aes(x = OTU_Count, y = Taxa, fill = Taxa)) +
+  
+  # draw the quantiles in the distribution. 
+  stat_density_ridges(quantile_lines = TRUE, alpha = 0.5,
+                      
+  # Add a rug underneath. 
+  jittered_points = TRUE,
+  position = position_points_jitter(width = 0.05, height = 0),
+  point_shape = '|', point_size = 3, point_alpha = 1)+
+
+  # change the limits of the x axis
+  scale_x_continuous(limits = c(-250, 1000), expand = c(0, 0)) +
+
+  facet_wrap(~site)+
+  
+  theme_gray()+
+
+  labs(
+    x = "Operational Taxonomic Unit Count",
+    y = "Taxa Selected",
+    title = "Layered Densitogram",
+    subtitle = "Distribution of Operational Taxonomic Units of selected bacteria",
+    caption = "Data from doi.org/10.1111/1751-7915.12334") +
+  
+  scale_fill_manual(values = c("#00AFBB", "#E7B800", "#FC4E07"))+
+  
+  theme(
+    legend.position = "top",
+    axis.text.x = element_text(angle = 60, hjust=1, size = 7),
+    plot.title=element_text(face="bold", size=20, colour = "darkblue"))
+
+
+```
+
+***
+
+* According to the research paper below, the operational taxonomic unit represents species richness.
+
+* The density plots above show that there is generally a higher variance in the "species richness" of Flavobacteria, Bacteroidia and Acidobacteria_GP18 in Vietnam, than there is in Tanzania.
+
+* These bacteria were sampled from 30 pit latrines in two different geographical regions; Tanzania and Vietnam. 
+
+* Paper: **Assessment of the influence of intrinsic environmental and geographical factors on the bacterial ecology of pit latrines.**
+
+The link to the paper can be found here : <https://sfamjournals.onlinelibrary.wiley.com/doi/full/10.1111/1751-7915.12334>
+
+***
+
+
