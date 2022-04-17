@@ -1,0 +1,180 @@
+---
+title: "R for Bio Data Science"
+author: "Oriade Latifah Simpson"
+date: "Spring 2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**Group Number: 20**
+
+***
+
+**Instructions**
+
+Let's go with PDF again.
+
+Remember, this is your chance to practise your stakeholder communication, so add a title, group number and names, some headers, a bit of text, etc.
+
+***
+
+Information about the data is found via this link here : <https://hbiostat.org/data/repo/Cdiabetes.html> 
+
+
+***
+
+**Diabetes Dataset**
+
+These data are courtesy of Dr John Schorling who worked at the Department of Medicine, University of Virginia School of Medicine.
+
+The data consist of 19 variables on 403 subjects from 1046 subjects who were interviewed in a study to understand the prevalence of obesity, diabetes, and other cardiovascular risk factors affecting African Americans in central Virginia, USA. 
+
+According to Dr John Hong, Diabetes Mellitus Type II (adult onset diabetes) is associated most strongly with obesity.
+
+The waist/hip ratio may be a predictor in diabetes and heart disease. 
+Diabetes Mellitus Type II is associated with hypertension. In this study, 403 subjects were screened for diabetes. 
+Glycosolated haemoglobin levels that were measured to be higher than 7.0 were recorded as being a positive diagnosis of diabetes. 
+
+For more information about this study see:
+
+* Willems JP, Saunders JT, DE Hunt, JB Schorling: Prevalence of coronary heart disease risk factors among rural blacks: A community-based study. Southern Medical Journal 90:814-820; 1997 
+
+
+* Schorling JB, Roach J, Siegel M, Baturka N, Hunt DE, Guterbock TM, Stewart HL: A trial of church-based smoking cessation interventions for rural African Americans. Preventive Medicine 26:92-101; 1997.
+
+***
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(magrittr)
+library(ggthemes)
+library(patchwork)
+```
+
+***
+
+**Q18: Which correlate better with BMI, WHR or BFP?**
+
+**Is there a certain plot-type, which can visualise if two variables are correlated?**
+
+**Can you perhaps use an R-function to compute the “correlation coefficient”?.**
+
+**Do not use e.g. ggpubr, use only tidyverse and base)**
+
+```{r message=FALSE, warning=FALSE}
+diabetes_data <- read_csv(file = "data/diabetes.csv", na = "NA")
+```
+
+
+```{r}
+diabetes_data_t1 <- diabetes_data %>% 
+  mutate(height_cm = round((height * 2.54), digits = 2),
+         weight_kg = round((weight / 2.20), digits = 2),
+         waist_cm = waist * 2.54,
+         hip_cm = hip * 2.54,
+         height_metres = height_cm /100,
+         gender = factor(gender),
+         location = factor(location),
+         bmi = round(weight_kg / (height_metres ^ 2), digits = 1),
+         gender_class = case_when( gender == "female" ~ 0,
+                                    gender == "male" ~ 1),
+         body_fat_percentage = ((1.39 * bmi) + (0.16* age) - (10.34 * gender_class) - 9),
+         waist_to_hip_ratio = round((waist_cm/ hip_cm), digits = 2))
+
+```
+
+***
+
+**BMI and waist to hip ratio**
+
+```{r}
+# drop the na values. 
+drop_na(diabetes_data_t1) %$%
+  cor(bmi, waist_to_hip_ratio) 
+```
+
+The correlation for bmi and waist to hip ratio is -0.08
+
+
+```{r message=FALSE, warning=FALSE}
+#Plot the relationship between bmi and waist to hip ratio**
+
+pl1 <- diabetes_data_t1 %>%
+  
+  ggplot(aes(x = bmi, y = waist_to_hip_ratio, fill = bmi)) +
+  
+  # change the size/transparency of the points
+  geom_point(size = 3, colour = "black", alpha = 0.5, pch = 21)+
+  
+  # fill with a continuous colour. 
+  scale_fill_continuous()+
+  
+  labs(subtitle = "bmi and waist to hip ratio correlation coefficient: -0.08",
+       x = "body mass index",
+       y = "waist to hip ratio")+
+  
+  geom_smooth(method = "lm", colour = "skyblue2") +
+  
+  theme_clean()
+ 
+
+``` 
+
+
+***
+
+**BMI and Body Fat Percentage**
+
+
+```{r}
+drop_na(diabetes_data_t1) %$% 
+  cor(bmi, body_fat_percentage)
+```
+
+The correlation for bmi and body fat percentage is 0.880
+
+```{r message=FALSE, warning=FALSE}
+#Plot the relationship between bmi and body fat percentage
+
+pl2 <- diabetes_data_t1 %>%
+  
+  ggplot(aes(x = bmi, y = body_fat_percentage, fill = bmi)) +
+  
+  # change the size/transparency of the points
+  geom_point(size = 3, colour = "black", alpha = 0.4, pch = 21)+
+  
+  # fill with a continuous colour. 
+  scale_fill_continuous()+
+  
+  labs( subtitle = "bmi and body fat percentage correlation coefficient: 0.88",
+        x = "body mass index",
+        y = "body fat percentage")+
+  
+  geom_smooth(method = "lm", colour = "darkgreen", linetype = "solid") +
+
+  theme_clean()
+``` 
+
+***
+
+Use the patchwork library to put the plots together.
+
+```{r message=FALSE, warning=FALSE}
+pl1 / (pl2)
+```
+
+
+The general trend of body mass index and waist to hip ratio is negative with a correlation coefficient of -0.08. 
+which indicates a non-linear relationship between the two variables.
+
+The general trend of body mass index and body fat percentage is positive and the correlation coefficient 0.88
+indicates the degree of linear relationship between the two variables. 
+
+***
+
+
