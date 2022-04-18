@@ -1,0 +1,199 @@
+---
+title: "R for Bio Data Science"
+author: "Oriade Latifah Simpson"
+date: "Spring 2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**Group Number 20**
+
+***
+
+**Instructions**
+
+Here is the assignment for lab 5. Make sure to read and implement any comments you may have gotten as feedback on the lab 4 hand in.
+
+Due Date 3 March 2022 @ 11.59pm
+
+***
+
+A recent study of T-cell receptors and SARS-CoV-2
+<https://www.researchsquare.com/article/rs-51964/v1>
+
+* The data is available from this link: 
+<https://clients.adaptivebiotech.com/pub/covid-2020>
+
+* There are also other data available for open analyses on this website: 
+<https://clients.adaptivebiotech.com/immuneaccess/browse?>
+
+* Release 002.1 - over 160,000 high-confidence SARS-CoV-2-specific TCRs
+
+* The downloaded zip file is ImmuneCODE-MIRA-Release002.1.zip
+
+* The two main files are called peptide-detail-ci.csv and subject-metadata.csv are saved in the data folder. 
+
+***
+
+ 
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+```
+
+```{r message=FALSE, warning=FALSE}
+peptide_data <- read_csv("data/ImmuneCODE-MIRA-Release002.1/peptide-detail-ci.csv",
+                         na = c("", "NA", "N/A"))
+
+meta_data <- read_csv("data/ImmuneCODE-MIRA-Release002.1/subject-metadata.csv",
+                      na = c("", "NA", "N/A"))
+```
+
+***
+
+**Q15: Per gene and in terms of percent, what are the 3 top alleles?**
+**Recreate this plot to answer the question**
+
+```{r}
+peptide_meta_data <- full_join(peptide_data, meta_data)
+
+# Remove columns that start with D,R,Q or P. 
+peptide_meta_data <- peptide_meta_data %>% 
+  select(-matches("D[RQP]"))
+
+#peptide_meta_data
+```
+
+```{r}
+allele_data <- peptide_meta_data %>% 
+  select(Subject, matches("H[LA]")) %>% 
+  distinct(Subject, .keep_all = TRUE)
+
+#allele_data
+```
+
+**Use pivot longer to convert the data into a long format.**
+
+```{r}
+allele_data_long <- allele_data %>%
+  pivot_longer(
+    cols = starts_with("HLA"),
+    names_to = "Gene",
+    values_to = "Allele",
+    #values_drop_na = TRUE
+  )
+
+#allele_data_long
+```
+
+**Q12: How many unique alleles are there?**
+
+
+* There are 155 HLA Alleles however, A*01:01 and A*01:01:01 are not in the same category. 
+
+* The type comes after the first *, so the type is 02, 23 44 , 04, 05, 11, 07 or 15 etc. 
+
+* The letter A, B or C stands for the gene. Gene A, Gene B, Gene C.
+
+* Field 2 comes after the semicolon and stands for the specific HLA protein, which is 13, or 01, or 02.
+
+* Afterwards, there may be a substitution or difference in a non-coding region and then a letter. 
+
+* The letter denotes change in the expression e.g N represents an allele that is not expressed. 
+
+
+```{r}
+allele_data_long %>% 
+  group_by(Allele) %>% 
+  summarise(n = n())
+```
+
+```{r}
+allele_data_long <- allele_data_long %>% 
+  # cut off the numbers from the Gene. 
+  mutate(Gene = str_sub(Gene, 1, 5),
+         # Collect the first 7 characters of the allele. 
+         Allele_F_1_2 = str_sub(Allele, 1,7),
+         # turn the gene into a factor and remove the NAs
+         Gene = as.factor(Gene)) %>% 
+         drop_na()
+
+#allele_data_long
+```
+
+**Q13: How many unique alleles are there now?**
+
+There are now 110 unique alleles. 
+
+```{r}
+allele_data_long %>% 
+  group_by(Allele_F_1_2) %>% 
+  summarise(n = n())
+```
+
+**Q14: What are the top 3 alleles in terms of counts in the data?**
+
+The top three alleles are :
+
+* A*02:01 with 75 with a high 10.9 % 
+
+* C*07:02 with 43 with 6.28 %
+
+* B*07:02 with a close 33 coming in at 4.82 %
+
+```{r}
+allele_data_long %>% 
+  count(Allele_F_1_2)%>%
+  arrange(desc(n)) %>% 
+  mutate(percent = n/sum(n) * 100) %>% 
+  head(n = 3)
+```
+
+
+
+**Q15: Per gene and in terms of percent, what are the 3 top alleles?**
+**Recreate this plot to answer the question GROUP ASSIGNMENT**
+
+```{r}
+plot_end_data <- allele_data_long %>% 
+  group_by(Gene)%>%
+  count(Allele_F_1_2)%>%
+  arrange(desc(n)) %>%
+  mutate(percent = n/sum(n) * 100) %>% 
+  arrange(desc(percent))
+
+
+#plot_end_data
+```
+
+```{r}
+# Factor the genes based on the group_by
+# Make the y axes similar using free_y and generate 3 columns using facet wrap. 
+
+plot_end_data %>% 
+  ggplot(mapping = aes(x = percent, y = fct_reorder(Allele_F_1_2, percent))) +
+  geom_col()+
+  
+  # rather than separating the data, just use facet wrap. 
+  
+  facet_wrap(vars(Gene), scales = "free_y", ncol = 3)+
+  labs(x = "Observed Allele Frequency (Within each gene) [%]", 
+       y = "Allele")+
+  theme_minimal(base_family = "Times", base_size = 9)
+
+```
+
+***
+
+* Source: A large scale database of T-cell receptor beta sequences and biding associations from natural and synthetic exposure to SARS-CoV-2 <https://www.researchsquare.com/article/rs-51964/v1> 
+
+
+* Nomenclature for Factors of the HLA system:<http://hla.alleles.org/nomenclature/naming.html>
+
+***
+
+
