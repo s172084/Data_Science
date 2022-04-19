@@ -1,0 +1,443 @@
+---
+title: "R for Bio Data Science"
+author: "Oriade Latifah Simpson"
+date: "Spring 2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**Group Number 20**
+
+***
+
+**Instructions**
+
+Once again, please upload your assignment as a PDF-file. 
+
+This time, remember to include the entire work flow of going from the raw data, to the final product.
+
+Also, remember to add headers and text where appropriate.
+
+Your task is to work through the blog post using your gravier_data_wide-dataset to create a PCA-analysis. 
+
+Make a Micro group report and hand in the knitted PDF File. 
+
+Think of a micro-report, practise delivering insights to stakeholders :-)
+
+Due Date 10 March 2022 11.59pm
+
+***
+
+
+# Modelling in the Tidyverse
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(ggthemes)
+library(broom)
+library(cowplot)
+library(ggrepel)
+library(fs)
+library(hrbrthemes)
+library(ggtech)
+library(kableExtra)
+
+```
+
+
+```{r}
+# read in the data. 
+gravier_clean_dat <- read_tsv(file = "data/01_gravier_clean.tsv.gz")
+head(gravier_clean_dat)
+```
+
+
+
+
+
+**Multiple Models**
+
+
+Now, make one model for each of the 2905 genes
+Create this long version of your data and save it in gravier_data_long
+
+```{r}
+gravier_data_long <- pivot_longer( data = gravier_clean_dat,
+                                   cols = ! starts_with("o"),
+                                   names_to = "gene",
+                                   values_to = "log2_expr_level")
+
+gravier_data_long
+```
+
+
+**Q2.2** Use the group_by() nest()  ungroup() work-flow, create this nested tibble.
+
+```{r}
+gravier_data_nested <- gravier_data_long %>% 
+  # group the data by genes. 
+  group_by(gene) %>% 
+  
+  # create a nested tibble composed of outcome and expression level. 
+  nest(data = c(outcome,log2_expr_level))%>%
+  
+  # ungroup the data. 
+  ungroup()
+
+gravier_data_nested
+```
+
+
+ **Q2.3** Then use sample_n() to randomly select 100 genes for further analysis. 
+Remember you may want to use the set.seed() function to create a reproducible random draw of 100 random genes. 
+
+```{r}
+set.seed(3201)
+
+gravier_data_nested <- sample_n(gravier_data_nested,100)
+gravier_data_nested
+```
+
+
+**Q2.4** Return to your gravier_data_long_nested-dataset and create the below, still saving it into your gravier_data_long_nested and remembering, that we here need a logistic regression.
+
+```{r}
+
+gravier_data_nested <-gravier_data_nested %>%
+                       mutate(model = map(data, ~ glm(outcome ~ log2_expr_level,
+                                                    data = ., 
+                                                    family = binomial(link = "logit"))))
+gravier_data_nested
+                     
+```
+
+There is a nested tibble in the data column and also a nested model in the model column. 
+The nested model is for each of these genes. 
+
+
+ **Q2.5** Extract some information from each of the models.
+
+```{r}
+gravier_data_nested <- gravier_data_nested %>%
+  
+  # for each model, generate tidy data with  estimate, std.error, statistic, p-value
+  mutate(tidied_model = map(model, tidy, conf.int = TRUE)) %>% 
+  
+ # take the tidied model out of a tibble and show it.
+ unnest(tidied_model)
+
+gravier_data_nested
+```
+
+ **Q2.5** Only interested in the terms for the genes, so remove the intercept rows. 
+
+```{r}
+gravier_data_long_nested <- gravier_data_nested %>% 
+  filter(str_detect(term,"log2_expr_level"))
+
+gravier_data_long_nested
+```
+
+***
+
+
+### PCA
+
+
+```{r}
+gravier_data_wide = gravier_clean_dat %>%
+  # pull the outcome, and all of the genes as columns out of the dataset. 
+  select(outcome, pull(gravier_data_long_nested, gene))
+
+gravier_data_wide
+```
+
+1. Look at the data in PCA coordinates. 
+
+2. Look at the rotation matrix
+
+3. Look at the variance explained by each principle component. 
+
+```{r}
+set.seed(109)
+
+pca_fit <- gravier_data_wide %>% 
+  select(where(is.numeric)) %>% # retain only numeric columns
+  prcomp(scale = TRUE, center = TRUE)
+
+#pca_fit
+```
+
+
+* plot the data in Principal Component Coordinates.
+
+* Combine the Principal Component coordinates with the original dataset, to colour points by categorical variables present in the original data using augment() function from broom.
+
+* Broom takes arguments the fitted model and the original data. 
+
+* The columns containing the fitted coordinates are called .fittedPC1, .fittedPC2.
+
+```{r, eval=FALSE, message=FALSE, warning=FALSE}
+broom_data <- pca_fit %>%
+  augment(gravier_data_wide) %>% 
+ # Find the first and second principal components. 
+  select(starts_with(".fitted"))
+```
+
+```{r message=FALSE, warning=FALSE}
+pca_fit %>%
+  augment(gravier_data_wide) %>% 
+  ggplot(mapping = aes(.fittedPC1, .fittedPC2, colour = factor(outcome))) +
+  
+  # make a scatter plot
+  geom_point( size = 3, alpha = 0.9) +
+  
+  # edit the legend title and contents. 
+  scale_fill_discrete(name = "outcome", labels = c("0", "1")) +
+  
+  # set the theme to classic 
+  theme_classic(base_family = "Times",
+                base_size = 12) +
+  
+  # put the legend at the bottom and justify to the center. 
+  theme(
+    legend.position = "bottom",
+    legend.justification = "center") +
+  
+  # change the limits on the x and y axis, and keep the title. 
+  scale_x_continuous(name = ".fittedPC1", limits = c(-10, 5)) +
+  scale_y_continuous(name = ".fittedPC2", limits = c(-5, 10)) +
+  
+  # final colour palette. 
+  scale_colour_excel_new()
+
+```
+
+
+
+**2. Look at the rotation matrix**
+
+```{r}
+# The rotation matrix is pca_fit$rotation or tidy command. 
+pca_fit %>%
+  tidy(matrix = "rotation")
+```
+
+```{r}
+# define the arrow style for plotting. 
+arrow_style <- arrow(
+  angle = 20, ends = "first", type = "closed", length = grid::unit(8, "pt")
+)
+```
+
+```{r}
+# generate a tidy PCA table. 
+my_grand_pca_table <- pca_fit %>%
+  tidy(matrix = "rotation") %>%
+  pivot_wider(names_from = "PC", names_prefix = "PC", values_from = "value")
+
+my_grand_pca_table[1:10,1:10]
+```
+
+```{r}
+# plot the first two principal components
+my_grand_pca_table %>% 
+  ggplot(mapping = aes(x = PC1, y = PC2)) +
+  
+  # Add the arrow burst to the plot
+  geom_segment(xend = 0, yend = 0, arrow = arrow_style)+
+  
+  # Add some text with the gene names. 
+  geom_text(mapping = aes(label = column), 
+            hjust = 1, nudge_x = -0.02, color = "#904C2F") +
+
+  # adjust the limits
+  #xlim(-1.25, .5) + ylim(-.5, 1) +
+  
+  # Spruce
+  theme_classic(base_family = "Helvetica",
+                base_size = 12) +
+  
+  # fix aspect ratio to 1:1
+  coord_fixed() + 
+
+  # change the font size of the axes. 
+  theme_minimal_grid(12)
+```
+
+**Look at the variance explained by each Principal Component**
+
+This is recorded in decimals ad can be converted to a percentage. 
+
+```{r}
+# Get all 101 rows with principal components. 
+# pca_fit %>% tidy("pcs")
+# or alternatively...
+pca_fit %>%
+  tidy(matrix = "eigenvalues") %>% 
+  mutate(percentage = percent * 100)
+```
+
+**Create a bar plot from this information.**
+
+```{r warning=FALSE}
+pca_fit %>%
+  tidy(matrix = "eigenvalues") %>%
+  
+  # Make a bar plot of the principal components. 
+  ggplot(mapping = aes(x = PC, y = percent)) +
+  
+  # make a bar plot
+  geom_col(colour = "darkblue", fill = "darkseagreen1", alpha = 0.3) +
+  
+  # Add a line and then some points. 
+  geom_line()+
+  
+  geom_point(shape=21, color="black", fill="darkslategray4", size=2) +
+  
+  # Adjust the x axis and the y axis. 
+  scale_x_continuous(breaks = 1:12, limits = c(0,10)) +
+  scale_y_continuous(labels = scales::percent_format(), 
+                     expand = expansion(mult = c(0, 0.01))) +
+  
+  # Add a grid
+  theme_minimal_hgrid(12)+
+  
+  theme_classic(base_family = "Helvetica",
+                base_size = 12) +
+  
+  # Add some labels. 
+  labs(
+    y = "Variance explained by each PC",
+    x = "The Principal Component",
+    title = "Principal Component Analysis Plot",
+    subtitle = " ",
+    caption = "Figure") 
+```
+
+The first component captures over 8.0 % of the variation in the data, which is not enough to separate outcome 0 from outcome 1 in the scatter plot. 
+
+Sourced from : <https://clauswilke.com/blog/2020/09/07/pca-tidyverse-style/>
+
+***
+
+### K-means
+
+Find groups which have not been expressly labelled in the data. 
+
+Work through this example using gravier data wide : <https://www.tidymodels.org/learn/statistics/k-means/>
+
+```{r}
+gravier_data_wide = gravier_clean_dat %>%
+   # pull the outcome, and all of the genes as columns out of the dataset. 
+  select(outcome, pull(gravier_data_long_nested, gene))
+
+#gravier_data_wide
+
+
+# Perform K means clustering on two selected genes. 
+kclust <- gravier_data_wide %>% 
+  select( g1int1740, g4A12) %>% 
+  kmeans(centers = 4, algorithm = "Hartigan-Wong")
+
+#kclust
+```
+
+```{r}
+
+# Add the point classifications(clusters) to the original dataset. : 
+# note: the last column is .cluster. 
+augment(kclust, gravier_data_wide)
+```
+
+```{r}
+# plot the clusters. 
+augment(kclust, gravier_data_wide) %>% 
+  
+  ggplot(mapping =  aes(x = g1int1740, y = g4A12,  fill = .cluster, colour = .cluster)) +
+  
+  # create a scatter plot. 
+  geom_point(colour = "darkblue", pch = 21, size = 6, alpha = 0.3) +
+  
+  # Add a colour from ggthemes. 
+  scale_fill_discrete() +
+
+  # change the line colour. 
+  scale_fill_manual(values = c("chocolate1", "seagreen3","midnightblue", "plum")) +
+  #scale_color_manual(values = c("#00AFBB", "#E7B800", "blue4", "darkorange2"))+
+  
+  # Add the ellipse that i long for. 
+  stat_ellipse(type = "norm", linetype = 1 , geom ="polygon", level=0.8, alpha=0.1) +
+  
+  labs(subtitle = "K-Means Cluster Plot")+
+  
+  theme(base_family = "Times",
+                base_size = 10)+
+  # Change the theme. 
+  theme_minimal_grid()
+```
+
+```{r}
+# The cluster centroids are called centers
+kclust$centers
+```
+
+```{r}
+# summarise the data on a per cluster level. 
+tidy(kclust)
+```
+
+
+* size: Number of observations within each cluster
+
+* withinss: Within sum of square. The number of components return is equal to `k`
+
+* cluster: Indicates the cluster of each observation
+
+* centers: The cluster centers
+
+```{r}
+# extract a single row summary. 
+glance(kclust)
+```
+
+* totss: The total sum of squares
+
+* tot.withinss: Sum of withinss
+
+* betweenss: Total sum of square minus Within sum of squares
+
+* iter: iterations
+
+***
+
+**Optimal Number of Clusters**
+
+Get a convenient solution to estimate the optimal number of clusters.
+The variance captured in the space between the clusters. 
+The method used for estimating the optimal numberr of clusters is total within sum of squares. 
+
+```{r message=FALSE, warning=FALSE}
+factoextra::fviz_nbclust(x = gravier_data_wide, kmeans, method = "wss") +
+geom_vline(xintercept = 4, linetype = 2)
+```
+
+```{r message=FALSE, warning=FALSE}
+factoextra::fviz_cluster(kclust, data = gravier_data_wide,
+                        palette = c("plum", "seagreen3","midnightblue", "chocolate1"),
+                         #palette = c("#2E9FDF", "#00AFBB", "#E7B800", "#FC4E07"),
+                         #palette = viridisLite::turbo(4),
+                        
+                         main= "K Means Cluster Plot for Gravier Data",
+                         ellipse.type = "euclid",
+                         #star.plot = TRUE, 
+                         repel = TRUE, 
+                         # Avoid label overplotting 
+                         ggtheme = theme_minimal())
+```
+
