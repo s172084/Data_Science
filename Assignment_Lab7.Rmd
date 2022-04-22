@@ -104,11 +104,6 @@ library(usethis)
 usethis::use_git_config(user.name = "username", user.email = "email_address")
 ```
 
-```{r eval=FALSE, include=FALSE}
-usethis::use_git_config(user.name = "s172084", user.email = "s172084@dtu.dk")
-# OR usethis::use_git_config(user.name = "m.o.l.s", user.email = "orie.simpson@gmail.com")
-```
-
 ***
 
 ### Set up a PAT
