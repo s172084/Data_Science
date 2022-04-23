@@ -1,8 +1,4 @@
 ---
-output: rmarkdown::github_document
----
-
----
 title: "R for Bio Data Science"
 author: "Oriade Latifah Simpson"
 date: "Spring 2022"
